@@ -23,6 +23,7 @@ use crate::vmm_config::boot_source::{
 };
 use crate::vmm_config::drive::*;
 use crate::vmm_config::entropy::*;
+use crate::vmm_config::fs::{FsConfig, FsError};
 use crate::vmm_config::instance_info::InstanceInfo;
 use crate::vmm_config::machine_config::{MachineConfig, MachineConfigError, MachineConfigUpdate};
 use crate::vmm_config::memory_hotplug::{MemoryHotplugConfig, MemoryHotplugConfigError};
@@ -66,6 +67,8 @@ pub enum ResourcesError {
     EntropyConfig(#[from] EntropyDeviceError),
     /// Pmem device error: {0}
     PmemConfig(#[from] PmemConfigError),
+    /// File system device error: {0}
+    Fs(#[from] FsError),
     /// Memory hotplug config error: {0}
     MemoryHotplugConfig(#[from] MemoryHotplugConfigError),
 }
@@ -97,6 +100,8 @@ pub struct VmmConfig {
     pub entropy: Option<EntropyDeviceConfig>,
     #[serde(default, rename = "pmem")]
     pub pmem_devices: Vec<PmemConfig>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fs: Vec<FsConfig>,
     #[serde(skip)]
     pub serial_config: Option<SerialConfig>,
     pub memory_hotplug: Option<MemoryHotplugConfig>,
@@ -122,6 +127,8 @@ pub struct VmResources {
     pub entropy: EntropyDeviceBuilder,
     /// The pmem device configs.
     pub pmem: PmemBuilder,
+    /// Single-directory file system configuration.
+    pub fs: Vec<FsConfig>,
     /// The memory hotplug configuration.
     pub memory_hotplug: Option<MemoryHotplugConfig>,
     /// The optional Mmds data store.
@@ -228,6 +235,9 @@ impl VmResources {
             resources.build_entropy_device(entropy_device_config)?;
         }
 
+        for config in vmm_config.fs {
+            resources.set_fs(config)?;
+        }
         for pmem_config in vmm_config.pmem_devices.into_iter() {
             resources.build_pmem_device(pmem_config)?;
         }
@@ -390,6 +400,18 @@ impl VmResources {
         self.entropy.insert(body)
     }
 
+    /// Configure one file system export before boot.
+    pub fn set_fs(&mut self, config: FsConfig) -> Result<(), FsError> {
+        config.validate()?;
+        if !self.fs.is_empty() && self.fs[0].fs_id != config.fs_id {
+            return Err(FsError::Invalid(
+                "only one virtio-fs export is supported".into(),
+            ));
+        }
+        self.fs = vec![config];
+        Ok(())
+    }
+
     /// Builds a pmem device to be attached when the VM starts.
     pub fn build_pmem_device(&mut self, body: PmemConfig) -> Result<(), PmemConfigError> {
         let has_block_root = self.block.has_root_device();
@@ -481,7 +503,7 @@ impl VmResources {
 
     /// Allocates the given guest memory regions.
     ///
-    /// If vhost-user-blk devices are in use, allocates memfd-backed shared memory, otherwise
+    /// If vhost-user-blk or virtio-fs devices are in use, allocates shared memfd memory, otherwise
     /// prefers anonymous memory for performance reasons.
     fn allocate_memory_regions(
         &self,
@@ -495,14 +517,14 @@ impl VmResources {
 
         // Page faults are more expensive for shared memory mapping, including  memfd.
         // For this reason, we only back guest memory with a memfd
-        // if a vhost-user-blk device is configured in the VM, otherwise we fall back to
+        // if a vhost-user-blk or virtio-fs device is configured, otherwise we fall back to
         // an anonymous private memory.
         //
         // The vhost-user-blk branch is not currently covered by integration tests in Rust,
         // because that would require running a backend process. If in the future we converge to
         // a single way of backing guest memory for vhost-user and non-vhost-user cases,
         // that would not be worth the effort.
-        if vhost_user_device_used {
+        if vhost_user_device_used || !self.fs.is_empty() {
             memory::memfd_backed(
                 regions,
                 self.machine_config.track_dirty_pages,
@@ -552,6 +574,7 @@ impl From<&VmResources> for VmmConfig {
             vsock: resources.vsock.config(),
             entropy: resources.entropy.config(),
             pmem_devices: resources.pmem.configs.clone(),
+            fs: resources.fs.clone(),
             // serial_config is marked serde(skip) so that it doesnt end up in snapshots.
             serial_config: None,
             memory_hotplug: resources.memory_hotplug.clone(),
@@ -667,6 +690,7 @@ mod tests {
             mmds_size_limit: HTTP_MAX_PAYLOAD_SIZE,
             entropy: Default::default(),
             pmem: Default::default(),
+            fs: Default::default(),
             pci_enabled: false,
             serial_out_path: None,
             serial_rate_limiter_cfg: None,

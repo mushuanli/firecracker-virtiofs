@@ -1397,6 +1397,11 @@
                 "comment": "Used by vhost-user frontend to communicate with the backend"
             },
             {
+                "syscall": "recvmsg",
+                "comment": "Receive vhost-user REPLY_ACK during virtio-fs activation",
+                "args": [{"index": 2, "type": "dword", "op": "eq", "val": 0}]
+            },
+            {
                 "syscall": "restart_syscall",
                 "comment": "automatically issued by the kernel when specific timing-related syscalls (e.g. nanosleep) get interrupted by SIGSTOP"
             },

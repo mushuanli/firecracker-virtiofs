@@ -339,6 +339,33 @@ paths:
           schema:
             $ref: "#/definitions/Error"
 
+  /fs/{fs_id}:
+    put:
+      summary: Configure a single virtio-fs export before boot.
+      description: Requires MMIO and fixed shared guest memory. No DAX, hotplug or snapshots. Directory authorization and read-only enforcement belong to the backend supervisor.
+      operationId: putGuestFsByID
+      parameters:
+        - name: fs_id
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/Fs"
+      responses:
+        204:
+          description: Configuration accepted; backend connection occurs at boot.
+        400:
+          description: Invalid configuration or operation after boot.
+          schema:
+            $ref: "#/definitions/Error"
+        default:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
   /pmem/{id}:
     put:
       summary: Creates or updates a pmem device. Pre-boot only.
@@ -1302,6 +1329,24 @@ definitions:
         type: integer
         description: Suggested optimal (maximum) I/O size, in units of logical blocks.
 
+  Fs:
+    type: object
+    additionalProperties: false
+    required: [fs_id, tag, socket]
+    properties:
+      fs_id:
+        type: string
+        pattern: '^[a-zA-Z0-9_-]+$'
+      tag:
+        type: string
+        minLength: 1
+        maxLength: 36
+        pattern: '^[a-zA-Z0-9_-]+$'
+      socket:
+        type: string
+        minLength: 1
+        description: Trusted vhost-user socket path visible inside the VMM jail.
+
   Pmem:
     type: object
     required:
@@ -1365,6 +1410,11 @@ definitions:
         description: Configurations for all net devices.
         items:
           $ref: "#/definitions/NetworkInterface"
+      fs:
+        type: array
+        maxItems: 1
+        items:
+          $ref: "#/definitions/Fs"
       pmem:
         type: array
         description: Configurations for all pmem devices.

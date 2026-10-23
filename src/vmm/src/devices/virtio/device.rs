@@ -62,6 +62,7 @@ impl DeviceState {
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum VirtioDeviceType {
+    Fs = 26,
     Net = virtio_ids::VIRTIO_ID_NET as u8,
     Block = virtio_ids::VIRTIO_ID_BLOCK as u8,
     Rng = virtio_ids::VIRTIO_ID_RNG as u8,
@@ -81,6 +82,11 @@ pub type VirtioDeviceId = (VirtioDeviceType, String);
 /// expose them to the transport via get_queues/get_queue_events/get_interrupt/get_interrupt_status
 /// fns.
 pub trait VirtioDevice: AsAny + MutEventSubscriber + Send {
+    /// Whether an unrecoverable backend failure requested VM shutdown.
+    fn is_failed(&self) -> bool {
+        false
+    }
+
     /// Get the available features offered by device.
     fn avail_features(&self) -> u64;
 

@@ -99,6 +99,9 @@ impl TryFrom<&Request> for ParsedRequest {
             (Method::Put, "boot-source", Some(body)) => parse_put_boot_source(body),
             (Method::Put, "cpu-config", Some(body)) => parse_put_cpu_config(body),
             (Method::Put, "drives", Some(body)) => parse_put_drive(body, path_tokens.next()),
+            (Method::Put, "fs", Some(body)) => {
+                super::request::fs::parse_put_fs(body, path_tokens.next())
+            }
             (Method::Put, "pmem", Some(body)) => parse_put_pmem(body, path_tokens.next()),
             (Method::Put, "logger", Some(body)) => parse_put_logger(body),
             (Method::Put, "serial", Some(body)) => parse_put_serial(body),

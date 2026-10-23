@@ -348,6 +348,7 @@ impl Vmm {
         let mut net = Vec::new();
         let mut net_with_mmds = Vec::new();
         let mut pmem = Vec::new();
+        let mut fs = Vec::new();
         let mut balloon = None;
         let mut vsock = None;
         let mut entropy = None;
@@ -372,6 +373,14 @@ impl Vmm {
                                 mmds_ipv4_address = Some(mmds_ns.ipv4_addr());
                             }
                         }
+                    }
+                }
+                VirtioDeviceType::Fs => {
+                    if let Some(f) = device
+                        .as_any()
+                        .downcast_ref::<crate::devices::virtio::fs::Fs>()
+                    {
+                        fs.push(f.config.clone());
                     }
                 }
                 VirtioDeviceType::Pmem => {
@@ -427,6 +436,7 @@ impl Vmm {
             vsock,
             entropy,
             pmem_devices: pmem,
+            fs,
             // serial_config is marked serde(skip) so that it doesnt end up in snapshots
             serial_config: None,
             memory_hotplug,
@@ -438,6 +448,9 @@ impl Vmm {
         let mut tuples = Vec::new();
         self.device_manager
             .for_each_virtio_device(|device_type, device| {
+                if device_type == VirtioDeviceType::Fs {
+                    tuples.push(("virtio-fs", device.id().to_owned()));
+                }
                 if let VirtioDeviceType::Block = device_type
                     && let Some(b) = device.as_any().downcast_ref::<Block>()
                     && b.is_vhost_user()
@@ -820,7 +833,14 @@ impl MutEventSubscriber for Vmm {
                             }
                         }
 
-                        // No CPUs exited with error status code, report "Ok"
+                        let mut device_failed = false;
+                        self.device_manager.for_each_virtio_device(|_, device| {
+                            device_failed |= device.is_failed();
+                        });
+                        if device_failed {
+                            break 'exit_code FcExitCode::GenericError;
+                        }
+                        // No CPUs or devices exited with error status code, report "Ok"
                         FcExitCode::Ok
                     };
                     self.stop(exit_code);

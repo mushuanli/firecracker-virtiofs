@@ -86,6 +86,8 @@ pub enum VmmAction {
     InsertBlockDevice(BlockDeviceConfig),
     /// Add a virtio-pmem device.
     InsertPmemDevice(PmemConfig),
+    /// Configure a preboot virtio-fs export.
+    InsertFs(crate::vmm_config::fs::FsConfig),
     /// Update an existing pmem device's rate limiter.
     UpdatePmemDevice(PmemDeviceUpdateConfig),
     /// Add a new network interface config or update one that already exists using the
@@ -177,6 +179,8 @@ pub enum VmmActionError {
     EntropyConfig(#[from] EntropyDeviceError),
     /// Pmem config error: {0}
     PmemConfig(#[from] PmemConfigError),
+    /// File system configuration: {0}
+    Fs(#[from] crate::vmm_config::fs::FsError),
     /// Memory hotplug config error: {0}
     MemoryHotplugConfig(#[from] MemoryHotplugConfigError),
     /// Memory hotplug update error: {0}
@@ -476,6 +480,11 @@ impl<'a> PrebootApiController<'a> {
             GetVmmVersion => Ok(VmmData::VmmVersion(self.instance_info.vmm_version.clone())),
             InsertBlockDevice(config) => self.insert_block_device(config),
             InsertPmemDevice(config) => self.insert_pmem_device(config),
+            InsertFs(config) => {
+                self.boot_path = true;
+                self.vm_resources.set_fs(config)?;
+                Ok(VmmData::Empty)
+            }
             InsertNetworkDevice(config) => self.insert_net_device(config),
             LoadSnapshot(config) => self
                 .load_snapshot(&config)
@@ -847,6 +856,7 @@ impl RuntimeApiController {
                 .update_memory_hotplug_size(cfg.requested_size_mib)
                 .map(|_| VmmData::Empty)
                 .map_err(VmmActionError::MemoryHotplugUpdate),
+            InsertFs(_) => Err(VmmActionError::OperationNotSupportedPostBoot),
             // Operations not allowed post-boot.
             ConfigureBootSource(_)
             | ConfigureLogger(_)

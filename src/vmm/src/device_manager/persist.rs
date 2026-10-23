@@ -377,6 +377,9 @@ impl<'a> Persist<'a> for MMIOVirtioDevices {
                         device_info,
                     })
                 }
+                VirtioDeviceType::Fs => {
+                    unreachable!("virtio-fs snapshots are rejected before serialization")
+                }
                 VirtioDeviceType::Mem => {
                     let mem = locked_device
                         .as_mut_any()

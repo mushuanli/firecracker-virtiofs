@@ -470,6 +470,9 @@ impl<'a> Persist<'a> for PciDevices {
                         transport_state,
                     });
                 }
+                VirtioDeviceType::Fs => {
+                    unreachable!("virtio-fs snapshots are rejected before serialization")
+                }
                 VirtioDeviceType::Mem => {
                     let mem_dev = locked_virtio_dev
                         .as_mut_any()

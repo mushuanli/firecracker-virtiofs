@@ -79,6 +79,8 @@ pub enum StartMicrovmError {
     CreateNetDevice(crate::devices::virtio::net::NetError),
     /// Cannot create pmem device: {0}
     CreatePmemDevice(#[from] crate::devices::virtio::pmem::device::PmemError),
+    /// Cannot create virtio-fs device: {0}
+    CreateFsDevice(#[from] crate::vmm_config::fs::FsError),
     /// Error creating legacy device: {0}
     #[cfg(target_arch = "x86_64")]
     CreateLegacyDevice(device_manager::legacy::LegacyDeviceError),
@@ -247,6 +249,13 @@ pub fn build_microvm_for_boot(
         &vm,
         &mut boot_cmdline,
         vm_resources.net_builder.iter(),
+        event_manager,
+    )?;
+    attach_fs_devices(
+        &mut device_manager,
+        &vm,
+        &mut boot_cmdline,
+        vm_resources,
         event_manager,
     )?;
     attach_pmem_devices(
@@ -705,6 +714,40 @@ fn attach_net_devices<'a, I: Iterator<Item = &'a Arc<Mutex<Net>>> + Debug>(
             cmdline,
             event_manager,
             false,
+        )?;
+    }
+    Ok(())
+}
+
+fn attach_fs_devices(
+    manager: &mut DeviceManager,
+    vm: &Vm,
+    cmdline: &mut LoaderKernelCmdline,
+    resources: &VmResources,
+    events: &mut EventManager,
+) -> Result<(), StartMicrovmError> {
+    if !resources.fs.is_empty() && (resources.pci_enabled || resources.memory_hotplug.is_some()) {
+        return Err(crate::vmm_config::fs::FsError::Invalid(
+            "virtio-fs requires MMIO and fixed guest memory".into(),
+        )
+        .into());
+    }
+    for config in &resources.fs {
+        let fs = crate::devices::virtio::fs::Fs::new(
+            config.clone(),
+            vm.as_kvm()
+                .ok_or(AttachDeviceError::NotSupported)?
+                .vcpus_exit_evt()
+                .try_clone()
+                .map_err(crate::vmm_config::fs::FsError::EventFd)?,
+        )?;
+        manager.attach_boot_virtio_device(
+            vm,
+            config.fs_id.clone(),
+            Arc::new(Mutex::new(fs)),
+            cmdline,
+            events,
+            true,
         )?;
     }
     Ok(())
