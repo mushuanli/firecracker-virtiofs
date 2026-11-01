@@ -1,3 +1,9 @@
+# fc-hp
+
+fc-hp 是供 NestOS 智能节点使用的 Firecracker 源码分支，集成 virtio-fs 目录直通与 Rust 测试工具。源码仓库：[mushuanli/fc-hp](https://github.com/mushuanli/fc-hp)。上游为 [Firecracker](https://github.com/firecracker-microvm/firecracker)，内部 Cargo 包、可执行程序及 microVM API 沿用 Firecracker 命名。
+
+在 NestOS 工作区中的路径为 `tools/fc-hp`，由相邻 `tools/fc-server` 的构建脚本使用。独立构建继续使用下文的 Firecracker 工具链；已有上游说明与署名保留。
+
 <picture>
    <source media="(prefers-color-scheme: dark)" srcset="docs/images/fc_logo_full_transparent-bg_white-fg.png">
    <source media="(prefers-color-scheme: light)" srcset="docs/images/fc_logo_full_transparent-bg.png">

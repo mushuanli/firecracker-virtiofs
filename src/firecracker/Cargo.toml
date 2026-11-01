@@ -4,8 +4,9 @@ version = "1.18.0-dev"
 authors = ["Amazon Firecracker team <firecracker-devel@amazon.com>"]
 edition = "2024"
 build = "build.rs"
-description = "Firecracker enables you to deploy workloads in lightweight virtual machines, called microVMs, which provide enhanced security and workload isolation over traditional VMs, while enabling the speed and resource efficiency of containers."
-homepage = "https://firecracker-microvm.github.io/"
+description = "fc-hp: the NestOS Firecracker fork with virtio-fs directory passthrough and Rust test tooling"
+homepage = "https://github.com/mushuanli/fc-hp"
+repository = "https://github.com/mushuanli/fc-hp"
 license = "Apache-2.0"
 
 [lib]
